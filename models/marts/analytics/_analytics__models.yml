@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: rpt_hourly_trip_volume
+    description: "Hourly trip volume patterns"
+  - name: rpt_top_pickup_locations
+    description: "Top 20 pickup locations by revenue"
+  - name: rpt_fare_analysis
+    description: "Fare metrics by day and time"
+  - name: rpt_payment_breakdown
+    description: "Payment method distribution"
+  - name: rpt_peak_vs_offpeak
+    description: "Peak vs off-peak comparison"

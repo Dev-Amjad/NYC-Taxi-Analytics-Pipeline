@@ -1,0 +1,38 @@
+version: 2
+
+sources:
+  - name: raw_nyc_taxi
+    description: "Raw NYC taxi data - simulates Fivetran landing zone"
+    database: a8s-marketing
+    schema: raw_nyc_taxi
+    
+    tables:
+      - name: yellow_tripdata
+        description: "Yellow taxi trip records from NYC TLC"
+        loaded_at_field: _fivetran_synced
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+        columns:
+          - name: vendor_id
+            description: "TPEP provider (1=Creative Mobile, 2=VeriFone)"
+          - name: pickup_datetime
+            description: "Date and time when meter was engaged"
+          - name: dropoff_datetime
+            description: "Date and time when meter was disengaged"
+          - name: passenger_count
+            description: "Number of passengers"
+          - name: trip_distance
+            description: "Trip distance in miles"
+          - name: pickup_location_id
+            description: "TLC Taxi Zone for pickup"
+          - name: dropoff_location_id
+            description: "TLC Taxi Zone for dropoff"
+          - name: payment_type
+            description: "Payment method code"
+          - name: fare_amount
+            description: "Base fare from meter"
+          - name: tip_amount
+            description: "Tip amount"
+          - name: total_amount
+            description: "Total charged to passenger"
