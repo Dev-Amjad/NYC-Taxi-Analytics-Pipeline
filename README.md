@@ -136,7 +136,7 @@ Breaks down performance by rate code (airport vs standard vs negotiated) with pe
 
 ## Part 4: Dashboard
 
-**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
+**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/u/0/reporting/dc4cf9e7-efc6-4dd1-b6c6-0894e41d7228)
 
 The dashboard connects directly to the BigQuery mart tables and includes:
 
@@ -355,7 +355,8 @@ nyc_taxi_analytics/
 
 **Amjad Ali**
 Data & AI Engineer
+[LinkedIn](https://linkedin.com/in/amjad-ali-ml)
 
 ---
 
-**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
+**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/u/0/reporting/dc4cf9e7-efc6-4dd1-b6c6-0894e41d7228)
