@@ -1,0 +1,8 @@
+rate_code_id,rate_code_name,rate_category
+1,Standard rate,standard
+2,JFK,airport
+3,Newark,airport
+4,Nassau or Westchester,negotiated
+5,Negotiated fare,negotiated
+6,Group ride,group
+99,Unknown,standard

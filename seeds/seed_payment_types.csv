@@ -1,0 +1,7 @@
+payment_type_id,payment_type_name,is_electronic
+1,Credit Card,true
+2,Cash,false
+3,No Charge,false
+4,Dispute,false
+5,Unknown,false
+6,Voided,false

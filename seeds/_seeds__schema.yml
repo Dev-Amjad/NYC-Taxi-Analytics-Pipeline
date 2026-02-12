@@ -1,0 +1,38 @@
+version: 2
+
+seeds:
+  - name: seed_vendors
+    description: "Lookup table for taxi vendor/TPEP provider codes"
+    columns:
+      - name: vendor_id
+        description: "Vendor identifier (1 or 2)"
+        tests:
+          - unique
+          - not_null
+
+  - name: seed_rate_codes
+    description: "Lookup table for TLC rate codes"
+    columns:
+      - name: rate_code_id
+        description: "Rate code identifier (1-6, 99=Unknown)"
+        tests:
+          - unique
+          - not_null
+
+  - name: seed_payment_types
+    description: "Lookup table for payment method codes"
+    columns:
+      - name: payment_type_id
+        description: "Payment type identifier (1-6)"
+        tests:
+          - unique
+          - not_null
+
+  - name: seed_taxi_zones
+    description: "All 263 NYC TLC taxi zones with borough and service zone"
+    columns:
+      - name: location_id
+        description: "TLC taxi zone location identifier"
+        tests:
+          - unique
+          - not_null
