@@ -2,23 +2,130 @@ version: 2
 
 models:
   - name: fct_trips
-    description: "Fact table containing all taxi trip transactions"
+    description: "Central fact table containing all taxi trip transactions with denormalized dimension attributes"
     columns:
       - name: trip_id
-        description: "Primary key"
+        description: "Surrogate primary key for each trip"
         tests:
+          - unique
           - not_null
       - name: pickup_date
+        description: "Date of pickup (partition key)"
         tests:
           - not_null
       - name: total_amount
+        description: "Total amount charged to the passenger"
         tests:
           - not_null
-          
-  - name: dim_locations
-    description: "Dimension table with stats per pickup location"
+      - name: vendor_id
+        description: "Foreign key to dim_vendor"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_vendor')
+              field: vendor_id
+              config:
+                severity: warn
+      - name: pickup_location_id
+        description: "Foreign key to dim_location for pickup zone"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+              config:
+                severity: warn
+      - name: dropoff_location_id
+        description: "Foreign key to dim_location for dropoff zone"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_location')
+              field: location_id
+              config:
+                severity: warn
+      - name: payment_type_id
+        description: "Foreign key to dim_payment_type"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_payment_type')
+              field: payment_type_id
+              config:
+                severity: warn
+      - name: rate_code_id
+        description: "Foreign key to dim_rate_code"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_rate_code')
+              field: rate_code_id
+              config:
+                severity: warn
+      - name: trip_distance_category
+        description: "Distance bucket: Short/Medium/Long"
+        tests:
+          - not_null
+      - name: trip_duration_category
+        description: "Duration bucket: Quick/Average/Extended/Long Haul"
+        tests:
+          - not_null
+      - name: passenger_category
+        description: "Passenger count bucket: Solo/Small Group/Large Group/Unknown"
+        tests:
+          - not_null
+
+  - name: dim_vendor
+    description: "Vendor dimension - taxi technology provider lookup"
+    columns:
+      - name: vendor_id
+        description: "Primary key - vendor identifier"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_rate_code
+    description: "Rate code dimension - TLC fare rate lookup"
+    columns:
+      - name: rate_code_id
+        description: "Primary key - rate code identifier"
+        tests:
+          - unique
+          - not_null
+      - name: rate_category
+        description: "Rate grouping: standard, airport, negotiated, group"
+        tests:
+          - accepted_values:
+              values: ['standard', 'airport', 'negotiated', 'group']
+
+  - name: dim_payment_type
+    description: "Payment type dimension - payment method lookup"
+    columns:
+      - name: payment_type_id
+        description: "Primary key - payment type identifier"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_location
+    description: "Location dimension - all 263 TLC taxi zones with borough and service zone"
     columns:
       - name: location_id
+        description: "Primary key - TLC taxi zone ID"
+        tests:
+          - unique
+          - not_null
+      - name: zone_category
+        description: "Zone classification: Manhattan Core, Manhattan Other, Outer Borough, Airport, Other"
+        tests:
+          - accepted_values:
+              values: ['Manhattan Core', 'Manhattan Other', 'Outer Borough', 'Airport', 'Other']
+
+  - name: dim_date
+    description: "Date dimension covering Q1 2022 (Jan 1 - Mar 31)"
+    columns:
+      - name: date_day
+        description: "Primary key - calendar date"
         tests:
           - unique
           - not_null
