@@ -2,166 +2,174 @@
 
 **Take-Home Assessment for Alpha Mu Digital**
 
-A production-style end-to-end analytics pipeline analyzing NYC Yellow Taxi trip data using the modern data stack: **BigQuery + dbt Core + Looker Studio**.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Business Questions](#business-questions)
-- [Tech Stack](#tech-stack)
-- [Data Pipeline](#data-pipeline)
-- [Project Structure](#project-structure)
-- [Setup Instructions](#setup-instructions)
-- [Data Models](#data-models)
-- [Testing](#testing)
-- [Dashboard](#dashboard)
-- [Design Decisions](#design-decisions)
-- [Productionization](#productionization)
-- [Author](#author)
+An end-to-end analytics pipeline analyzing ~1M NYC Yellow Taxi trips (Q1 2022) using the modern data stack: **BigQuery + dbt Core + Looker Studio**.
 
 ---
 
 ## Overview
 
-This project demonstrates a complete analytics workflow from raw data ingestion to business-ready dashboards. Using NYC Yellow Taxi trip data from Q1 2022 (~1 million trips), the pipeline transforms raw transactional data into actionable insights.
+This project builds a production-style star schema data warehouse from raw NYC TLC Yellow Taxi trip records. The pipeline ingests ~1 million trip records from Q1 2022, applies layered dbt transformations (staging, intermediate, marts), and produces business-ready fact/dimension tables plus analytical reports.
 
-**Key Highlights:**
-- Simulated Fivetran ingestion with metadata columns
-- Layered dbt transformations (staging → intermediate → marts)
-- Dimensional modeling with fact and dimension tables
-- Comprehensive testing suite (15 tests)
-- Interactive Looker Studio dashboard
+**Dataset:** NYC Yellow Taxi Trip Data, Q1 2022 (January - March), ~1M rows sampled from BigQuery public data.
+
+**Why this dataset:** NYC taxi data is large-scale, publicly available, well-documented by the TLC, and rich enough to demonstrate dimensional modeling, data quality handling, and meaningful business analytics.
 
 ---
 
-## Business Questions
-
-The pipeline answers these key business questions:
-
-| # | Question | Report Model |
-|---|----------|--------------|
-| 1 | Which pickup locations generate the most revenue? | `rpt_top_pickup_locations` |
-| 2 | How does trip volume vary by hour of day? | `rpt_hourly_trip_volume` |
-| 3 | What's the average fare per mile by day/time? | `rpt_fare_analysis` |
-| 4 | How do payment methods differ in usage and tips? | `rpt_payment_breakdown` |
-| 5 | How do peak hours compare to off-peak demand? | `rpt_peak_vs_offpeak` |
-
----
-
-## Tech Stack
+## Stack & Constraints
 
 | Component | Tool | Purpose |
 |-----------|------|---------|
-| Data Warehouse | Google BigQuery | Storage and compute |
-| Transformation | dbt Core 1.11 | Data modeling and testing |
-| Visualization | Looker Studio | Dashboard and reporting |
-| Ingestion | SQL script | Simulates Fivetran sync |
+| Data Warehouse | Google BigQuery | Storage, compute, partitioning & clustering |
+| Transformation | dbt Core 1.11 | Layered modeling, testing, documentation |
+| Visualization | Looker Studio | Interactive dashboard |
+| Ingestion | SQL script | Simulates Fivetran CDC sync |
+| Packages | dbt_utils 1.1.1 | Surrogate keys, date spine |
+
+**Constraints:** Free-tier BigQuery, dbt Core (not Cloud), no orchestrator, single-developer workflow.
 
 ---
 
-## Data Pipeline
+## Part 1: Ingestion
 
-### Layer Overview
+The ingestion script (`scripts/ingest_raw_data.sql`) simulates a Fivetran sync by:
 
-| Layer | Schema | Description | Materialization |
-|-------|--------|-------------|-----------------|
-| **Raw** | `raw_nyc_taxi` | Landing zone mimicking Fivetran | Table |
-| **Staging** | `dbt_dev_staging` | Cleaned, renamed, typed | View |
-| **Intermediate** | `dbt_dev_intermediate` | Enriched with derived fields | View |
-| **Marts** | `dbt_dev_marts` | Business-ready tables | Table |
+1. Creating a `raw_nyc_taxi` schema as a landing zone
+2. Copying ~1M rows from `bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022` (Q1 2022)
+3. Adding Fivetran-style metadata columns: `_fivetran_synced` (timestamp) and `_fivetran_deleted` (soft-delete flag)
 
-### Transformation Flow
-
-```
-Source: bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022
-    │
-    ▼
-Raw: raw_nyc_taxi.yellow_tripdata (1M rows, Fivetran metadata added)
-    │
-    ▼
-Staging: stg_nyc_taxi__yellow_trips (cleaned, filtered, surrogate key)
-    │
-    ▼
-Intermediate: int_trips_enriched (time dimensions, derived metrics)
-    │
-    ▼
-Marts: fct_trips (fact table) + dim_locations (dimension table)
-    │
-    ▼
-Analytics: 5 report tables for dashboards
-```
+This approach mirrors a production Fivetran setup where the raw layer is untouched and downstream transformations handle all cleaning.
 
 ---
 
-## Project Structure
+## Part 2: dbt Transformations
+
+### Layer Architecture
+
+| Layer | Schema | Materialization | Purpose |
+|-------|--------|-----------------|---------|
+| **Seeds** | `dbt_dev_seeds` | Table | Static lookup data (vendors, rate codes, payment types, 263 taxi zones) |
+| **Staging** | `dbt_dev_staging` | View | Clean, rename, type-cast, filter invalid records |
+| **Intermediate** | `dbt_dev_intermediate` | View | Enrich with derived metrics, categorizations, time dimensions |
+| **Marts (Core)** | `dbt_dev_marts` | Table | Star schema: 1 fact table + 5 dimension tables |
+| **Marts (Analytics)** | `dbt_dev_marts` | Table | Pre-aggregated report tables for dashboards |
+
+### Star Schema
 
 ```
-nyc_taxi_analytics/
-│
-├── dbt_project.yml              # Project configuration
-├── packages.yml                 # dbt packages (dbt_utils)
-├── README.md                    # This file
-│
-├── models/
-│   ├── staging/
-│   │   └── nyc_taxi/
-│   │       ├── _sources.yml                    # Source definitions
-│   │       ├── _stg_nyc_taxi__models.yml       # Model tests & docs
-│   │       └── stg_nyc_taxi__yellow_trips.sql  # Staging model
-│   │
-│   ├── intermediate/
-│   │   └── int_trips_enriched.sql              # Enriched trips
-│   │
-│   └── marts/
-│       ├── core/
-│       │   ├── _core__models.yml               # Core model tests
-│       │   ├── fct_trips.sql                   # Fact table
-│       │   └── dim_locations.sql               # Dimension table
-│       │
-│       └── analytics/
-│           ├── _analytics__models.yml          # Analytics docs
-│           ├── rpt_hourly_trip_volume.sql
-│           ├── rpt_top_pickup_locations.sql
-│           ├── rpt_fare_analysis.sql
-│           ├── rpt_payment_breakdown.sql
-│           └── rpt_peak_vs_offpeak.sql
-│
-├── tests/
-│   ├── assert_positive_trip_duration.sql       # Custom test
-│   └── assert_revenue_consistency.sql          # Custom test
-│
-└── scripts/
-    └── ingest_raw_data.sql                     # Ingestion script
+                        ┌──────────────┐
+                        │  dim_vendor  │
+                        │  vendor_id   │
+                        │  vendor_name │
+                        └──────┬───────┘
+                               │
+┌──────────────┐    ┌──────────┴───────────┐    ┌─────────────────┐
+│ dim_location │    │      fct_trips       │    │ dim_payment_type│
+│ location_id  │◄───┤ trip_id (PK)         ├───►│ payment_type_id │
+│ zone_name    │    │ vendor_id (FK)       │    │ payment_type_name│
+│ borough      │    │ pickup_location_id   │    │ is_electronic   │
+│ service_zone │    │ dropoff_location_id  │    └─────────────────┘
+│ zone_category│    │ payment_type_id (FK) │
+└──────────────┘    │ rate_code_id (FK)    │    ┌─────────────────┐
+                    │ pickup_date (FK)     │    │  dim_rate_code  │
+┌──────────────┐    │ store_and_fwd_flag   ├───►│  rate_code_id   │
+│  dim_date    │    │ trip_distance_miles   │    │  rate_code_name │
+│  date_day    │◄───┤ trip_duration_minutes │    │  rate_category  │
+│  year/month  │    │ fare_amount          │    │  is_airport_rate│
+│  day_of_week │    │ total_amount         │    └─────────────────┘
+│  is_weekend  │    │ revenue_per_hour     │
+└──────────────┘    │ ...43 columns total  │
+                    └──────────────────────┘
 ```
+
+### Complete Model Inventory
+
+| Model | Type | Rows | Description |
+|-------|------|------|-------------|
+| `stg_nyc_taxi__yellow_trips` | Staging (View) | ~981K | Cleaned, typed, filtered raw trips |
+| `int_trips_enriched` | Intermediate (View) | ~981K | +date dims, categories, speed, revenue/hour |
+| `fct_trips` | Fact (Table) | ~981K | Central fact table, partitioned by month, clustered |
+| `dim_vendor` | Dimension (Table) | 2 | Vendor lookup from seed |
+| `dim_rate_code` | Dimension (Table) | 7 | Rate code lookup with airport flag |
+| `dim_payment_type` | Dimension (Table) | 6 | Payment type lookup with electronic flag |
+| `dim_location` | Dimension (Table) | 263 | TLC taxi zones with borough and zone category |
+| `dim_date` | Dimension (Table) | 90 | Calendar dimension for Q1 2022 |
+| `agg_location_stats` | Aggregate (Table) | ~242 | Per-location aggregated metrics |
+| `rpt_zone_performance` | Report (Table) | ~484 | Pickup + dropoff zone analysis |
+| `rpt_trip_patterns` | Report (Table) | varies | Day x hour x distance x passenger heatmap |
+| `rpt_revenue_summary` | Report (Table) | 90 | Daily revenue with composition breakdown |
+| `rpt_payment_and_tipping` | Report (Table) | varies | Payment + tip behavior by segment |
+| `rpt_service_analysis` | Report (Table) | varies | Rate code, peak/off-peak, congestion |
 
 ---
 
-## Setup Instructions
+## Part 3: Analytics Questions
+
+The pipeline answers these business questions through dedicated report models:
+
+### 1. Which zones generate the most revenue and how do pickup vs. dropoff patterns differ?
+**Model:** `rpt_zone_performance`
+
+Analyzes both pickup and dropoff directions per zone, enriched with zone name and borough from `dim_location`. Includes avg speed, revenue per hour, and fare per mile for efficiency comparison.
+
+### 2. What are the trip demand patterns by day, hour, distance, and passenger count?
+**Model:** `rpt_trip_patterns`
+
+Full heatmap data: day-of-week x hour x distance category (Short/Medium/Long) x passenger category (Solo/Small Group/Large Group). Includes speed and efficiency metrics per segment.
+
+### 3. How does revenue break down by component (base fare, tips, tolls, surcharges)?
+**Model:** `rpt_revenue_summary`
+
+Daily revenue with composition percentages: base_fare_pct + tip_pct + tolls_pct + surcharges_pct. Supports weekly roll-up via pickup_week column.
+
+### 4. How do tipping patterns vary by payment method, time, and trip type?
+**Model:** `rpt_payment_and_tipping`
+
+Tip distribution buckets (Zero Tip / Low / Standard / Generous) sliced by time_of_day, weekend flag, and distance category. Reveals that cash trips show zero tips (not recorded) while credit card tips cluster around 15-20%.
+
+### 5. How do rate codes (airport vs standard vs negotiated) compare, and what indicates congestion?
+**Model:** `rpt_service_analysis`
+
+Rate code breakdown with peak/off-peak splits. Includes congestion_pct (% of trips averaging < 10 mph), revealing that Manhattan peak hours show significantly higher congestion than airport runs.
+
+---
+
+## Part 4: Dashboard
+
+**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
+
+The dashboard connects directly to the BigQuery mart tables and includes:
+
+| Visualization | Source Table | Insight |
+|--------------|-------------|---------|
+| KPI Scorecards | `fct_trips` | Total trips, revenue, avg fare, avg tip % |
+| Hourly Demand Heatmap | `rpt_trip_patterns` | Peak hours: 6-9 PM weekdays |
+| Top Zones by Revenue | `rpt_zone_performance` | Midtown, UES, airports dominate |
+| Revenue Composition | `rpt_revenue_summary` | Base fare ~70%, tips ~15%, surcharges ~10% |
+| Payment & Tipping | `rpt_payment_and_tipping` | Credit card ~67% of trips |
+| Service Analysis | `rpt_service_analysis` | Airport trips: higher avg fare, lower congestion |
+
+---
+
+## Part 5: Setup & How to Run
 
 ### Prerequisites
 
 - Google Cloud account with BigQuery access
-- Python 3.8 or higher
+- Python 3.8+
 - Git
 
-### Step 1: Clone Repository
+### Step 1: Clone & Setup
 
 ```bash
-git clone https://github.com/yourusername/nyc-taxi-analytics.git
-cd nyc-taxi-analytics
-```
-
-### Step 2: Create Virtual Environment
-
-```bash
+git clone <repo-url>
+cd nyc_taxi_analytics
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install dbt-bigquery
 ```
 
-### Step 3: Configure dbt Profile
+### Step 2: Configure dbt Profile
 
 Create or edit `~/.dbt/profiles.yml`:
 
@@ -179,222 +187,171 @@ nyc_taxi_analytics:
       location: US
 ```
 
-### Step 4: Run Ingestion Script
+### Step 3: Ingest Raw Data
 
 Execute `scripts/ingest_raw_data.sql` in BigQuery Console to create the raw data layer.
 
-### Step 5: Install Dependencies & Build
+### Step 4: Build Everything
 
 ```bash
-dbt deps
-dbt build
+dbt deps                # Install dbt_utils
+dbt build               # Seeds + models + tests in DAG order
 ```
 
-### Step 6: Generate Documentation
+Or run each step individually:
+
+```bash
+dbt seed                # Load 4 seed CSVs
+dbt run                 # Build all models
+dbt test                # Run all ~56 tests
+```
+
+### Step 5: Explore Documentation
 
 ```bash
 dbt docs generate
-dbt docs serve  # Opens browser at localhost:8080
+dbt docs serve          # Opens at localhost:8080
 ```
 
 ---
 
-## Data Models
+## Assumptions
 
-### Fact Table: `fct_trips`
-
-The central fact table containing trip-level transactions.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `trip_id` | STRING | Surrogate key (primary key) |
-| `pickup_location_id` | INT64 | Foreign key to location |
-| `pickup_date` | DATE | Partition key |
-| `pickup_hour` | INT64 | Hour of pickup (0-23) |
-| `is_weekend` | BOOLEAN | Weekend flag |
-| `time_of_day_bucket` | STRING | Morning Rush/Midday/Evening Rush/Night/Late Night |
-| `trip_distance_miles` | FLOAT64 | Trip distance |
-| `trip_duration_minutes` | INT64 | Duration in minutes |
-| `fare_amount` | FLOAT64 | Base fare |
-| `tip_amount` | FLOAT64 | Tip amount |
-| `total_amount` | FLOAT64 | Total charged |
-| `fare_per_mile` | FLOAT64 | Derived: fare/distance |
-| `tip_percentage` | FLOAT64 | Derived: tip/fare × 100 |
-| `payment_type_name` | STRING | Credit Card/Cash/etc. |
-
-**Optimizations:**
-- Partitioned by `pickup_date` (monthly granularity)
-- Clustered by `pickup_location_id`, `payment_type_id`
-- ~981,600 rows
-
-### Dimension Table: `dim_locations`
-
-Aggregated statistics per pickup location.
-
-| Column | Type | Description |
-|--------|------|-------------|
-| `location_id` | INT64 | Primary key |
-| `total_trips` | INT64 | Trip count |
-| `total_revenue` | FLOAT64 | Sum of total_amount |
-| `avg_trip_revenue` | FLOAT64 | Average fare |
-| `avg_trip_distance_miles` | FLOAT64 | Average distance |
-| `avg_tip_percentage` | FLOAT64 | Average tip % |
-| `credit_card_pct` | FLOAT64 | % paid by card |
-| `revenue_rank` | INT64 | Rank by revenue |
-| `trip_volume_rank` | INT64 | Rank by trips |
-
-**Stats:** 242 unique pickup locations
+- **1M row sample** is representative of Q1 2022 patterns (full dataset is ~10M+ rows)
+- **Trip distance > 0 and < 500 miles** filters out GPS errors and zero-distance records
+- **Total amount > 0 and < $10,000** removes refunds, chargebacks, and data entry errors
+- **Rate code nulls mapped to 99 (Unknown)** rather than dropping those rows
+- **Cash tips are not recorded** in the source data; tip analysis is inherently biased toward credit card trips
+- **store_and_fwd_flag** nulls are preserved as-is (not all records have this populated)
+- **Taxi zone IDs 258-263** are placeholder/unknown zones in the TLC reference data
 
 ---
 
-## Testing
-
-### Test Summary
-
-| Test Type | Count | Description |
-|-----------|-------|-------------|
-| `not_null` | 10 | Required field validation |
-| `unique` | 2 | Primary key uniqueness |
-| Custom | 2 | Business rule validation |
-| **Total** | **14** | |
-
-### Custom Tests
-
-**`assert_positive_trip_duration`**: Warns if trips have zero or negative duration (data quality monitoring).
-
-**`assert_revenue_consistency`**: Validates that `total_amount >= fare_amount`.
-
-### Running Tests
-
-```bash
-dbt test                    # Run all tests
-dbt test --select staging   # Test staging layer only
-dbt test --select fct_trips # Test specific model
-```
-
-### Latest Test Results
-
-```
-PASS=23  WARN=1  ERROR=0  SKIP=0
-```
-
----
-
-## Dashboard
-
-**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
-
-### Visualizations
-
-| Chart | Type | Insight |
-|-------|------|---------|
-| Total Trips | Scorecard | 981,600 trips in Q1 2022 |
-| Total Revenue | Scorecard | $X.XX million |
-| Avg Fare | Scorecard | $XX.XX per trip |
-| Hourly Volume | Line Chart | Peak hours: 6-9 PM |
-| Top Locations | Bar Chart | Top 20 by revenue |
-| Payment Methods | Pie Chart | Credit card dominant |
-| Peak vs Off-Peak | Table | Comparison metrics |
-
----
-
-## Design Decisions
-
-### Decisions Made
+## Tradeoffs & Design Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| **1M row sample** | Sufficient for demonstrating patterns while staying within free tier |
-| **Q1 2022 data** | Recent, complete quarter with seasonal variation |
-| **Row-number surrogate key** | Source lacks natural unique key; ensures uniqueness |
-| **Views for staging/intermediate** | Reduces storage costs; always reflects latest data |
-| **Tables for marts** | Optimized query performance for dashboards |
-| **Monthly partitioning** | Balances partition count with query efficiency |
-| **Location + payment clustering** | Most common filter/group-by columns |
+| **Seed-based dimensions** over hard-coded CASE statements | Maintainable, testable, single source of truth for lookups |
+| **Denormalized fact table** (joins vendor_name, payment_type_name, rate_code_name) | Eliminates joins for Looker Studio; dimensions still available for proper star schema queries |
+| **Views for staging/intermediate** | Reduces storage cost; always reflects latest logic |
+| **Tables for marts** | Optimized query performance for dashboard reads |
+| **Monthly partitioning + 3-column clustering** on fct_trips | Balances partition pruning with common query patterns |
+| **Revenue per hour** as a core metric | Better measures driver efficiency than revenue per trip |
+| **Congestion indicator** (% trips < 10 mph) | Proxy for traffic conditions without external data |
+| **Row-number surrogate key** | Source lacks natural unique key; deterministic ordering ensures reproducibility |
+| **Warn severity** on duration/speed tests | Flags data quality issues without blocking the pipeline |
 
-### Tradeoffs
+---
 
-| Tradeoff | Impact | Mitigation |
-|----------|--------|------------|
-| No incremental models | Full refresh on each run | Acceptable for 1M rows; would implement for production |
-| Simulated ingestion | Missing CDC, schema handling | Documented how Fivetran would differ |
-| No zone name lookup | Location IDs instead of names | Could join TLC zone reference data |
-| Warning on duration test | 3,071 trips with zero/negative duration | Data quality issue in source; flagged, not blocked |
+## What Would Improve With More Time
+
+- **Incremental models** for fct_trips (append-only pattern on pickup_date)
+- **Origin-Destination (OD) matrix** report for route-level analysis
+- **Weather data join** to correlate trip patterns with conditions
+- **dbt exposures** to formally document Looker Studio dashboard dependencies
+- **Unit tests** with dbt's built-in unit testing framework
+- **Snapshot tables** for SCD Type 2 tracking on dimension changes
+- **CI/CD pipeline** with PR-based dbt slim CI (`dbt build --select state:modified+`)
+- **Monte Carlo or Elementary** for data observability and anomaly detection
+- **Zone-to-zone distance estimation** using centroid calculations for better speed/efficiency metrics
 
 ---
 
 ## Productionization
 
-### With Full Tool Access
-
 | Component | Current | Production |
 |-----------|---------|------------|
-| **Ingestion** | Manual SQL script | Fivetran with CDC connectors |
-| **Transformation** | dbt Core (local) | dbt Cloud with scheduling |
-| **Testing** | Manual `dbt test` | CI/CD pipeline on PR |
-| **Monitoring** | None | dbt Cloud alerts + Monte Carlo |
-| **Visualization** | Looker Studio | Looker with LookML metrics |
+| **Ingestion** | Manual SQL script | Fivetran with CDC + auto schema propagation |
+| **Transformation** | dbt Core (local) | dbt Cloud with scheduled jobs |
+| **Testing** | Manual `dbt test` | CI/CD: `dbt build` on every PR |
+| **Monitoring** | None | dbt Cloud alerts + Elementary dashboards |
+| **Orchestration** | Manual | Airflow/Dagster triggering dbt Cloud API |
+| **Visualization** | Looker Studio | Looker with governed LookML metrics layer |
 
-### Fivetran Configuration
+---
 
-```yaml
-connector:
-  type: bigquery
-  sync_frequency: 15_minutes
-  sync_mode: incremental
-  cursor_field: pickup_datetime
-  schema_handling: auto_propagate
-```
+## Testing Summary
 
-### dbt Cloud Configuration
+| Category | Count | Examples |
+|----------|-------|---------|
+| `unique` | 10 | PKs on all dimensions, fact, staging, intermediate, reports |
+| `not_null` | 22 | All PKs, FKs, and critical measures |
+| `accepted_values` | 12 | vendor_id, payment_type_id, rate_code_id, categories, buckets |
+| `relationships` | 5 | fct_trips FKs to all dimensions |
+| Custom (error) | 3 | Grain uniqueness, revenue consistency |
+| Custom (warn) | 3 | Duration range, speed plausibility, store_and_fwd_flag values |
+| **Total** | **~55** | |
 
-```yaml
-jobs:
-  - name: daily_production
-    schedule: "0 6 * * *"  # 6 AM daily
-    commands:
-      - dbt run
-      - dbt test
-      - dbt source freshness
-    notifications:
-      slack: "#data-alerts"
+```bash
+dbt test                    # Run all tests
+dbt test --select staging   # Test staging layer only
+dbt test --select tag:relationships  # Test FK integrity
 ```
 
 ---
 
-## Time Log
+## Project Structure
 
-| Phase | Duration |
-|-------|----------|
-| Environment setup | 30 min |
-| Data ingestion | 20 min |
-| Staging model | 30 min |
-| Intermediate model | 20 min |
-| Mart models | 45 min |
-| Analytics reports | 30 min |
-| Testing & debugging | 45 min |
-| Looker Studio dashboard | 45 min |
-| Documentation | 30 min |
-| **Total** | **~5.5 hours** |
+```
+nyc_taxi_analytics/
+├── dbt_project.yml
+├── packages.yml
+├── README.md
+│
+├── seeds/
+│   ├── _seeds__schema.yml
+│   ├── seed_vendors.csv             # 2 vendors
+│   ├── seed_rate_codes.csv          # 7 rate codes
+│   ├── seed_payment_types.csv       # 6 payment types
+│   └── seed_taxi_zones.csv          # 263 TLC taxi zones
+│
+├── models/
+│   ├── staging/nyc_taxi/
+│   │   ├── _sources.yml
+│   │   ├── _stg_nyc_taxi__models.yml
+│   │   └── stg_nyc_taxi__yellow_trips.sql
+│   │
+│   ├── intermediate/
+│   │   ├── _int__models.yml
+│   │   └── int_trips_enriched.sql
+│   │
+│   └── marts/
+│       ├── core/
+│       │   ├── _core__models.yml
+│       │   ├── fct_trips.sql
+│       │   ├── dim_vendor.sql
+│       │   ├── dim_rate_code.sql
+│       │   ├── dim_payment_type.sql
+│       │   ├── dim_location.sql
+│       │   └── dim_date.sql
+│       │
+│       └── analytics/
+│           ├── _analytics__models.yml
+│           ├── agg_location_stats.sql
+│           ├── rpt_zone_performance.sql
+│           ├── rpt_trip_patterns.sql
+│           ├── rpt_revenue_summary.sql
+│           ├── rpt_payment_and_tipping.sql
+│           └── rpt_service_analysis.sql
+│
+├── tests/
+│   ├── assert_positive_trip_duration.sql
+│   ├── assert_revenue_consistency.sql
+│   ├── assert_valid_trip_duration_range.sql
+│   ├── assert_fact_grain_unique.sql
+│   └── assert_valid_speed.sql
+│
+└── scripts/
+    └── ingest_raw_data.sql
+```
 
 ---
 
 ## Author
 
-**Amjad Ali**  
+**Amjad Ali**
 Data & AI Engineer
 
-- 📧 Email: amjadaligolocsais.com
-- 💼 LinkedIn: [linkedin.com/in/amjad-ali-ml](https://linkedin.com/in/amjad-ali-ml)
-- 🐙 GitHub: [github.com/Dev-Amjad](https://github.com/Dev-Amjad)
-
 ---
 
-## License
-
-This project was created under 5 hours.
 **Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
-
----
-
-*Built with ❤️ using dbt + BigQuery + Looker Studio*
