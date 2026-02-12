@@ -1,13 +1,79 @@
 version: 2
 
 models:
-  - name: rpt_hourly_trip_volume
-    description: "Hourly trip volume patterns"
-  - name: rpt_top_pickup_locations
-    description: "Top 20 pickup locations by revenue"
-  - name: rpt_fare_analysis
-    description: "Fare metrics by day and time"
-  - name: rpt_payment_breakdown
-    description: "Payment method distribution"
-  - name: rpt_peak_vs_offpeak
-    description: "Peak vs off-peak comparison"
+  - name: agg_location_stats
+    description: "Aggregated statistics per pickup location, enriched with zone name and borough from dim_location"
+    columns:
+      - name: location_id
+        description: "Primary key - pickup location zone ID"
+        tests:
+          - unique
+          - not_null
+      - name: zone_name
+        description: "TLC taxi zone name"
+      - name: borough
+        description: "NYC borough name"
+      - name: total_trips
+        description: "Total number of trips from this location"
+        tests:
+          - not_null
+
+  - name: rpt_zone_performance
+    description: "Zone-level performance analysis for both pickup and dropoff directions, enriched with zone metadata"
+    columns:
+      - name: location_id
+        description: "TLC taxi zone ID"
+        tests:
+          - not_null
+      - name: direction
+        description: "Whether this row represents pickup or dropoff stats"
+        tests:
+          - accepted_values:
+              values: ['pickup', 'dropoff']
+
+  - name: rpt_trip_patterns
+    description: "Demand heatmap data: trip volume and metrics by day-of-week, hour, distance category, and passenger category"
+    columns:
+      - name: trip_count
+        description: "Number of trips in this segment"
+        tests:
+          - not_null
+
+  - name: rpt_revenue_summary
+    description: "Daily revenue with composition breakdown (base fare, tips, tolls, surcharges as percentages)"
+    columns:
+      - name: pickup_date
+        description: "Calendar date"
+        tests:
+          - unique
+          - not_null
+      - name: total_revenue
+        description: "Total revenue for the day"
+        tests:
+          - not_null
+
+  - name: rpt_payment_and_tipping
+    description: "Payment method and tipping behavior analysis with tip distribution buckets sliced by time, weekend, and distance"
+    columns:
+      - name: payment_type_id
+        description: "Payment method code"
+        tests:
+          - not_null
+      - name: tip_bucket
+        description: "Tip generosity bucket"
+        tests:
+          - accepted_values:
+              values: ['Zero Tip', 'Low (<10%)', 'Standard (10-20%)', 'Generous (>20%)']
+
+  - name: rpt_service_analysis
+    description: "Rate code breakdown with peak/off-peak analysis and congestion indicators"
+    columns:
+      - name: rate_code_id
+        description: "TLC rate code"
+        tests:
+          - not_null
+      - name: peak_category
+        description: "Peak or Off-Peak classification"
+        tests:
+          - accepted_values:
+              values: ['Peak', 'Off-Peak']
