@@ -393,6 +393,7 @@ Data & AI Engineer
 ## License
 
 This project was created under 5 hours.
+**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
 
 ---
 
