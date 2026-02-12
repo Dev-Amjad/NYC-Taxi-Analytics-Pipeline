@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: int_trips_enriched
+    description: "Enriched trip data with date dimensions, trip categorization, and derived financial metrics"
+    columns:
+      - name: trip_id
+        description: "Surrogate key for each trip"
+        tests:
+          - unique
+          - not_null
+      - name: trip_distance_category
+        description: "Trip distance bucket: Short (<2mi), Medium (2-10mi), Long (>10mi)"
+        tests:
+          - accepted_values:
+              values: ['Short', 'Medium', 'Long']
+      - name: trip_duration_category
+        description: "Trip duration bucket: Quick (<10min), Average (10-30min), Extended (30-60min), Long Haul (>60min)"
+        tests:
+          - accepted_values:
+              values: ['Quick', 'Average', 'Extended', 'Long Haul']
+      - name: passenger_category
+        description: "Passenger count bucket: Solo (1), Small Group (2-3), Large Group (4+), Unknown"
+        tests:
+          - accepted_values:
+              values: ['Solo', 'Small Group', 'Large Group', 'Unknown']
+      - name: time_of_day_bucket
+        description: "Time period: Morning Rush, Midday, Evening Rush, Night, Late Night"
+        tests:
+          - accepted_values:
+              values: ['Morning Rush', 'Midday', 'Evening Rush', 'Night', 'Late Night']
