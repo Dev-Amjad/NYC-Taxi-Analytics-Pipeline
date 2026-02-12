@@ -282,7 +282,7 @@ PASS=23  WARN=1  ERROR=0  SKIP=0
 
 ## Dashboard
 
-**Looker Studio Dashboard:** [View Dashboard](YOUR_DASHBOARD_LINK_HERE)
+**Looker Studio Dashboard:** [View Dashboard](https://lookerstudio.google.com/s/h_Kxfie8lXo)
 
 ### Visualizations
 
