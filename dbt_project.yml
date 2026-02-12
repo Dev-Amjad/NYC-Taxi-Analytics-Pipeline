@@ -16,6 +16,10 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+seeds:
+  nyc_taxi_analytics:
+    +schema: seeds
+
 models:
   nyc_taxi_analytics:
     staging:
