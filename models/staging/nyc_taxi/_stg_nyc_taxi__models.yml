@@ -2,30 +2,78 @@ version: 2
 
 models:
   - name: stg_nyc_taxi__yellow_trips
-    description: "Cleaned and standardized yellow taxi trips"
+    description: "Cleaned and standardized yellow taxi trips from the raw NYC TLC data"
     columns:
       - name: trip_id
         description: "Surrogate key for each trip"
         tests:
+          - unique
           - not_null
       - name: vendor_id
+        description: "TPEP provider code"
         tests:
           - not_null
+          - accepted_values:
+              values: [1, 2]
+              quote: false
+              config:
+                severity: warn
       - name: pickup_location_id
+        description: "TLC taxi zone ID for pickup"
         tests:
           - not_null
       - name: dropoff_location_id
+        description: "TLC taxi zone ID for dropoff"
         tests:
           - not_null
       - name: pickup_at
+        description: "Timestamp when the meter was engaged"
         tests:
           - not_null
       - name: dropoff_at
+        description: "Timestamp when the meter was disengaged"
         tests:
           - not_null
       - name: payment_type_id
+        description: "Payment method code"
         tests:
           - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6]
+              quote: false
+              config:
+                severity: warn
+      - name: rate_code_id
+        description: "TLC rate code in effect at end of trip"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6, 99]
+              quote: false
+      - name: store_and_fwd_flag
+        description: "Whether the trip record was held in vehicle memory before sending (Y/N)"
+        tests:
+          - accepted_values:
+              values: ['Y', 'N']
+              config:
+                severity: warn
       - name: total_amount
+        description: "Total amount charged to the passenger"
         tests:
           - not_null
+      - name: passenger_count
+        description: "Number of passengers in the vehicle"
+      - name: trip_distance_miles
+        description: "Trip distance in miles reported by the taximeter"
+      - name: fare_amount
+        description: "Time-and-distance fare calculated by the meter"
+      - name: extra_charges
+        description: "Miscellaneous extras and surcharges (rush hour, overnight)"
+      - name: mta_tax
+        description: "MTA tax automatically triggered based on metered rate"
+      - name: tip_amount
+        description: "Tip amount (auto-populated for credit card, cash tips not included)"
+      - name: tolls_amount
+        description: "Total amount of all tolls paid in trip"
+      - name: improvement_surcharge
+        description: "Improvement surcharge assessed on hailed trips"
